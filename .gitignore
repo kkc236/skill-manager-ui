@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.local
+dev-server.log
+.logs/
+skill-vault/skills/
+skill-vault/state.json
