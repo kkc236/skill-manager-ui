@@ -25,6 +25,7 @@ import {
   assignVaultSkillCategory,
   createVaultCategory,
   deactivateVaultSkill,
+  deleteVaultSkill,
   fetchInventory,
   fetchManifest,
   fetchVaultSkillFile,
@@ -35,12 +36,18 @@ import {
 import {
   applySkillFilter,
   buildManifest,
+  deleteSkillFromVault,
   installSkill,
   markUpdated,
   removeSkill,
   toggleSkill,
 } from "./lib/skillModel";
 import { initialActivity, seedSkills } from "./lib/seedSkills";
+import { fallbackCategories, applyFrontendCategories, buildFolderCategories, slugifyCategory, categoryColor } from "./utils/categories";
+import { BASE_PRESET_ID, defaultTaskPresets, seedTaskPresets, persistTaskPresets, normalizeTaskPreset, normalizeSkillIds, resolveInheritedPresetSkillIds, resolvePresetSkillIds, buildPresetSummaries, filterPresetSkillOptions } from "./utils/presets";
+import { buildSkillAudits, buildSidebarHealthSummary, buildSkillMarkdown, clamp, removeSelectedIds, statusLabel, apiStatusLabel, compactPath } from "./utils/helpers";
+import GuidePage, { guideSteps } from "./components/GuidePage";
+import { useToast } from "./hooks/useToast";
 
 const filterTabs = [
   { id: "all", label: "全部" },
@@ -49,17 +56,7 @@ const filterTabs = [
   { id: "updates", label: "需同步" },
 ];
 
-const fallbackCategories = [
-  { id: "writing", name: "论文写作", color: "#8b5cf6" },
-  { id: "frontend", name: "前端与界面", color: "#0ea5e9" },
-  { id: "automation", name: "自动化工具", color: "#10b981" },
-  { id: "debugging", name: "调试测试", color: "#f97316" },
-  { id: "documents", name: "文档文件", color: "#64748b" },
-  { id: "uncategorized", name: "未分类", color: "#71717a" },
-];
-
-const navItems = [
-  { id: "cover", label: "封面", icon: Sparkle },
+const navItems = [  { id: "cover", label: "封面", icon: Sparkle },
   { id: "library", label: "技能库", icon: Layers3 },
   { id: "presets", label: "预设", icon: Bolt },
   { id: "install", label: "安装源", icon: GitBranch },
@@ -74,9 +71,6 @@ const viewTitles = {
   manifest: "Skill 清单",
   settings: "控制台设置",
 };
-
-const PRESET_STORAGE_KEY = "skill-deck-task-presets-v1";
-const BASE_PRESET_ID = "general-base";
 
 const materialLibraries = [
   {
@@ -125,94 +119,6 @@ const sourceLibraryItems = [
   },
 ];
 
-const defaultTaskPresets = [
-  {
-    id: BASE_PRESET_ID,
-    name: "通用场景",
-    description: "默认随专项场景叠加的基本盘，可按自己的 Codex 工作习惯调整。",
-    mode: "merge",
-    color: "#77f2bf",
-    skillIds: ["test-driven-development", "verification-before-completion", "using-superpowers"],
-  },
-  {
-    id: "paper-writing",
-    name: "论文写作",
-    description: "定稿、文档处理、PDF 校验和降重前置检查。",
-    mode: "merge",
-    color: "#8b5cf6",
-    skillIds: ["academic-paper-strategist", "academic-paper-composer", "documents", "pdf", "verification-before-completion"],
-  },
-  {
-    id: "frontend-shipping",
-    name: "前端开发",
-    description: "界面搭建、React 规范、浏览器验证和交互调试。",
-    mode: "merge",
-    color: "#0ea5e9",
-    skillIds: ["frontend-app-builder", "react-best-practices", "frontend-testing-debugging", "browser", "playwright"],
-  },
-  {
-    id: "debug-test",
-    name: "调试测试",
-    description: "复现、TDD、系统调试和完成前验证。",
-    mode: "merge",
-    color: "#f97316",
-    skillIds: ["systematic-debugging", "test-driven-development", "verification-before-completion", "requesting-code-review"],
-  },
-  {
-    id: "automation",
-    name: "自动化",
-    description: "Agent 编排、GitHub、批量任务和技能安装。",
-    mode: "merge",
-    color: "#10b981",
-    skillIds: ["dispatching-parallel-agents", "subagent-driven-development", "skill-installer", "github", "linear"],
-  },
-  {
-    id: "nihongo",
-    name: "日语学习",
-    description: "日语材料解析、语法练习和翻译辅助。",
-    mode: "merge",
-    color: "#14b8a6",
-    skillIds: ["japanese-tutor", "nihongo", "openai-docs"],
-  },
-];
-
-const guideSteps = [
-  {
-    id: "find",
-    number: "01",
-    label: "FIND",
-    title: "扫描本地 skills",
-    detail: "快速定位可用、已启用和需要更新的技能。",
-    actionLabel: "Preview find step",
-  },
-  {
-    id: "install",
-    number: "02",
-    label: "INSTALL",
-    title: "从 GitHub 安装",
-    detail: "粘贴仓库路径，生成本地 skill 索引。",
-    actionLabel: "Preview install step",
-  },
-  {
-    id: "sync",
-    number: "03",
-    label: "SYNC",
-    title: "同步更新状态",
-    detail: "检查版本、待更新项和最近操作。",
-    actionLabel: "Preview sync step",
-  },
-];
-
-const reticleTargetSelector = [
-  "button:not(:disabled)",
-  "a[href]",
-  "input:not(:disabled)",
-  "textarea:not(:disabled)",
-  "select:not(:disabled)",
-  "[role='button']",
-  "[tabindex]:not([tabindex='-1'])",
-].join(", ");
-const reticleHitSlop = 16;
 const guideCompleteStorageKey = "skill-deck-guide-complete";
 
 function hasCompletedGuide() {
@@ -231,34 +137,6 @@ function rememberGuideComplete() {
   } catch {
     // The app still works when storage is unavailable; it just shows the guide again.
   }
-}
-
-function findReticleTarget(root, eventTarget, clientX, clientY) {
-  const viewportTarget = root.ownerDocument?.elementFromPoint?.(clientX, clientY);
-  const viewportClosest =
-    viewportTarget && typeof viewportTarget.closest === "function"
-      ? viewportTarget.closest(reticleTargetSelector)
-      : null;
-
-  if (viewportClosest && root.contains(viewportClosest)) return viewportClosest;
-
-  const targetByPoint = Array.from(root.querySelectorAll(reticleTargetSelector)).find((element) => {
-    const rect = element.getBoundingClientRect();
-    return (
-      rect.width > 0 &&
-      rect.height > 0 &&
-      clientX >= rect.left - reticleHitSlop &&
-      clientX <= rect.right + reticleHitSlop &&
-      clientY >= rect.top - reticleHitSlop &&
-      clientY <= rect.bottom + reticleHitSlop
-    );
-  });
-
-  if (targetByPoint) return targetByPoint;
-
-  const closestTarget =
-    typeof eventTarget.closest === "function" ? eventTarget.closest(reticleTargetSelector) : null;
-  return closestTarget && root.contains(closestTarget) ? closestTarget : null;
 }
 
 export default function App() {
@@ -291,11 +169,11 @@ export default function App() {
   const [readerHeight, setReaderHeight] = useState(280);
   const [workbenchStage, setWorkbenchStage] = useState("manager");
   const [workbenchSplit, setWorkbenchSplit] = useState(80);
-  const [guideOpen, setGuideOpen] = useState(true);
+  const [guideOpen, setGuideOpen] = useState(() => !hasCompletedGuide());
   const [guideStepId, setGuideStepId] = useState(guideSteps[0].id);
   const [githubUrl, setGithubUrl] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [toast, setToast] = useState("");
+  const { toast, showToast: setToast, clearToast } = useToast();
   const fileInputRef = useRef(null);
   const readerResizeRef = useRef(null);
   const workbenchRef = useRef(null);
@@ -598,12 +476,12 @@ export default function App() {
 
     if (apiLive) {
       try {
-        let inventory = null;
-        for (const skillId of uniqueIds) {
-          inventory = nextEnabled
-            ? await activateVaultSkill(skillId)
-            : await deactivateVaultSkill(skillId);
-        }
+        const results = await Promise.all(
+          uniqueIds.map((skillId) =>
+            nextEnabled ? activateVaultSkill(skillId) : deactivateVaultSkill(skillId),
+          ),
+        );
+        const inventory = results[results.length - 1];
         if (inventory) applyInventory(inventory);
         setToast(`${nextEnabled ? "已批量激活" : "已批量关闭"} ${uniqueIds.length} 个 skill`);
         setBatchSelectedIds((current) => removeSelectedIds(current, uniqueIds));
@@ -745,15 +623,12 @@ export default function App() {
     if (apiLive) {
       setBatchPendingIds(new Set([...inactiveIds, ...closeIds]));
       try {
-        let inventory = null;
-        for (const skillId of inactiveIds) {
-          inventory = await activateVaultSkill(skillId);
-        }
-        for (const skillId of closeIds) {
-          inventory = await deactivateVaultSkill(skillId);
-        }
+        const results = await Promise.all([
+          ...inactiveIds.map((skillId) => activateVaultSkill(skillId)),
+          ...closeIds.map((skillId) => deactivateVaultSkill(skillId)),
+        ]);
+        const inventory = results[results.length - 1];
         if (inventory) applyInventory(inventory);
-        setActiveView("library");
         setToast(`已应用 ${preset.name}`);
       } catch (error) {
         setToast(`预设应用失败：${error.message}`);
@@ -784,7 +659,6 @@ export default function App() {
         return skill;
       }),
     );
-    setActiveView("library");
     setToast(`已应用 ${preset.name}`);
     pushActivity({
       title: "预设应用",
@@ -1067,20 +941,20 @@ export default function App() {
     if (apiLive) {
       setPendingSkillId(skillId);
       try {
-        const inventory = await deactivateVaultSkill(skillId);
+        const inventory = await deleteVaultSkill(skillId);
         applyInventory(inventory);
-        setToast("已关闭 Codex 副本，仓库原件保留");
+        setToast("已从仓库删除");
       } catch (error) {
-        setToast(`关闭失败：${error.message}`);
+        setToast(`删除失败：${error.message}`);
       } finally {
         setPendingSkillId("");
       }
       return;
     }
 
-    setSkills((current) => removeSkill(current, skillId));
+    setSkills((current) => deleteSkillFromVault(current, skillId));
     pushActivity({
-      title: "已移除",
+      title: "已从仓库删除",
       detail: target?.name ?? skillId,
       tone: "warn",
     });
@@ -1117,12 +991,57 @@ export default function App() {
   function handleImport(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setToast("清单已导入");
-    pushActivity({
-      title: "导入清单",
-      detail: file.name,
-      tone: "good",
-    });
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      try {
+        const manifest = JSON.parse(loadEvent.target.result);
+        const importedSkills = Array.isArray(manifest?.skills) ? manifest.skills : [];
+        if (!importedSkills.length) {
+          setToast("清单中没有可导入的 skill");
+          return;
+        }
+
+        if (apiLive) {
+          setToast(`清单包含 ${importedSkills.length} 个 skill，请通过安装源逐个下载`);
+          return;
+        }
+
+        const existingIds = new Set(skills.map((skill) => skill.id));
+        const newSkills = importedSkills
+          .filter((skill) => skill.id && !existingIds.has(skill.id))
+          .map((skill) => ({
+            id: skill.id,
+            name: skill.name ?? skill.id,
+            description: skill.description ?? "从清单导入的 skill。",
+            installed: true,
+            enabled: skill.enabled ?? false,
+            source: skill.source ?? "import",
+            status: "healthy",
+            version: skill.version ?? "local",
+            updatedAt: "刚刚",
+            path: skill.path ?? "",
+            triggers: skill.triggers ?? [skill.source ?? "import"],
+          }));
+
+        if (!newSkills.length) {
+          setToast("清单中的 skill 已全部存在");
+          return;
+        }
+
+        setSkills((current) => [...newSkills, ...current]);
+        setSelectedId(newSkills[0].id);
+        setToast(`已导入 ${newSkills.length} 个新 skill`);
+        pushActivity({
+          title: "导入清单",
+          detail: `${file.name} · ${newSkills.length} 个新 skill`,
+          tone: "good",
+        });
+      } catch {
+        setToast("清单文件格式错误，请上传有效的 JSON 文件");
+      }
+    };
+    reader.readAsText(file);
     event.target.value = "";
   }
 
@@ -1167,7 +1086,7 @@ export default function App() {
           </span>
           <div>
             <strong>Skill Deck</strong>
-            <small>Local Codex</small>
+            <small>本地 Codex</small>
           </div>
         </div>
 
@@ -1192,7 +1111,7 @@ export default function App() {
 
         <section className="sidebar-preset-summary" aria-label="当前场景预设" data-testid="sidebar-preset-summary">
           <div className="sidebar-section-head">
-            <span>Preset</span>
+            <span>预设</span>
             <strong>当前预设</strong>
           </div>
           <div className="preset-summary-orb" aria-hidden="true">
@@ -1201,7 +1120,7 @@ export default function App() {
           <strong>{activePresetSummary?.name ?? selectedPreset?.name ?? "未应用"}</strong>
           <small>
             {activePresetSummary
-              ? `${activePresetSummary.activeCount}/${activePresetSummary.skillIds.length} skills · ${
+              ? `${activePresetSummary.activeCount}/${activePresetSummary.skillIds.length} 个技能 · ${
                   activePresetSummary.mode === "focus" ? "专注" : "叠加"
                 }`
               : "自定义任务场景，按分类文件夹挑选 skills"}
@@ -1226,7 +1145,7 @@ export default function App() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyeline">Local Skill Console · {apiStatusLabel(apiStatus)}</p>
+            <p className="eyeline">本地技能控制台 · {apiStatusLabel(apiStatus)}</p>
             <h1>{viewTitles[activeView]}</h1>
           </div>
           <div className="top-actions">
@@ -1269,26 +1188,26 @@ export default function App() {
             aria-hidden="true"
           />
           <div className="command-deck-copy">
-            <span>VAULT COMMAND</span>
+            <span>仓库命令</span>
             <strong>{currentFolder?.name ?? "全部 Skills"}</strong>
             <p>{query ? `搜索锁定 "${query}"` : "浏览、归类、激活和关闭都围绕当前文件夹进行。"}</p>
           </div>
           <div className="command-deck-stats" aria-label="Skill 状态概览">
             <span>
               <strong>{skillsWithCategories.length}</strong>
-              <small>Total</small>
+              <small>总计</small>
             </span>
             <span>
               <strong>{enabledCount}</strong>
-              <small>Active</small>
+              <small>激活</small>
             </span>
             <span>
               <strong>{inactiveCount}</strong>
-              <small>Vault</small>
+              <small>仓库</small>
             </span>
             <span>
               <strong>{auditIssueCount}</strong>
-              <small>Issues</small>
+              <small>问题</small>
             </span>
           </div>
           <button
@@ -1326,7 +1245,7 @@ export default function App() {
             <div className="folder-head">
               <div>
                 <span>Skill 文件夹</span>
-                <strong>{folderCategories.length} groups</strong>
+                <strong>{folderCategories.length} 组</strong>
               </div>
               <img src="/icons/tabler/folder-open.svg" alt="" aria-hidden="true" />
             </div>
@@ -1344,7 +1263,7 @@ export default function App() {
                   <img src={category.id === "all" ? "/icons/tabler/archive.svg" : "/icons/tabler/folder.svg"} alt="" />
                   <span>{category.name}</span>
                   <strong>{category.count}</strong>
-                  <small>{category.activeCount} active</small>
+                  <small>{category.activeCount} 激活</small>
                 </button>
               ))}
             </div>
@@ -1365,7 +1284,7 @@ export default function App() {
           <section className="explorer-panel" aria-label="Skill 列表">
             <div className="explorer-toolbar">
               <div>
-                <span>Skill Explorer</span>
+                <span>技能浏览器</span>
                 <strong>{currentFolder?.name ?? "全部 Skills"}</strong>
               </div>
               <label className="search-box explorer-search">
@@ -1431,7 +1350,7 @@ export default function App() {
           </section>
           {batchMode && batchSelectedSkills.length > 0 ? (
             <div className="bulk-action-bar" aria-label="Bulk action bar">
-              <strong>{batchSelectedSkills.length} selected</strong>
+              <strong>{batchSelectedSkills.length} 已选</strong>
               <button
                 type="button"
                 aria-label="Activate selected skills"
@@ -1477,13 +1396,13 @@ export default function App() {
           data-promoted={workbenchStage === "inspector"}
           onClickCapture={(event) => handleStageClickCapture("inspector", event)}
         >
-          <aside className="detail-panel vault-detail skill-inspector" aria-label="Skill Inspector">
+          <aside className="detail-panel vault-detail skill-inspector" aria-label="技能检查器">
             <div className="detail-head">
               <span className="detail-icon">
                 <img src={selectedSkill?.enabled ? "/icons/tabler/file-check.svg" : "/icons/tabler/file-code.svg"} alt="" />
               </span>
               <div>
-                <small>Skill Inspector · {selectedSkill?.categoryName ?? selectedSkill?.source}</small>
+                <small>技能检查 · {selectedSkill?.categoryName ?? selectedSkill?.source}</small>
                 <h2>{selectedSkill?.name}</h2>
               </div>
             </div>
@@ -1496,7 +1415,7 @@ export default function App() {
             >
               <div className="reader-toolbar">
                 <div>
-                  <span>Reader Window</span>
+                  <span>阅读窗口</span>
                   <strong>{readerFocus === "skill" ? "SKILL.md" : "描述"}</strong>
                 </div>
                 <small>{readerHeight}px</small>
@@ -1542,7 +1461,7 @@ export default function App() {
                   onPointerDown={handleReaderResizeStart}
                 >
                   <span />
-                  <small>DRAG</small>
+                  <small>拖动</small>
                 </button>
               </div>
             </section>
@@ -1628,14 +1547,10 @@ export default function App() {
                 className="danger-button"
                 type="button"
                 onClick={() => handleRemove(selectedSkill?.id)}
-                disabled={
-                  !selectedSkill ||
-                  isSkillPending(selectedSkill?.id) ||
-                  (apiLive ? !selectedSkill?.enabled : !selectedSkill?.installed)
-                }
+                disabled={!selectedSkill || isSkillPending(selectedSkill?.id)}
               >
                 <Trash2 size={17} />
-                关闭副本
+                从仓库删除
               </button>
             </div>
           </aside>
@@ -1672,7 +1587,7 @@ export default function App() {
             <div className="view-card install-console">
               <div className="view-card-head">
                 <div>
-                  <span>GitHub Source</span>
+                  <span>GitHub 来源</span>
                   <strong>下载安装到 Vault，并可立即激活到 Codex</strong>
                 </div>
                 <GitBranch size={24} />
@@ -1696,7 +1611,7 @@ export default function App() {
             <div className="view-card source-library" data-testid="source-library" aria-label="推荐 Skill 资源库">
               <div className="view-card-head compact">
                 <div>
-                  <span>Resource Library</span>
+                  <span>资源库</span>
                   <strong>推荐包、收藏源和可更新提示</strong>
                 </div>
                 <PackageCheck size={22} />
@@ -1726,7 +1641,7 @@ export default function App() {
             <div className="view-card manifest-card">
               <div className="view-card-head">
                 <div>
-                  <span>Manifest</span>
+                  <span>清单数据</span>
                   <strong>当前 skill 清单预览</strong>
                 </div>
                 <FileJson size={24} />
@@ -1750,22 +1665,22 @@ export default function App() {
             <div className="view-card settings-card">
               <div className="view-card-head">
                 <div>
-                  <span>Local Paths</span>
+                  <span>本地路径</span>
                   <strong>本地仓库与 Codex 目标路径</strong>
                 </div>
                 <Settings2 size={24} />
               </div>
               <dl className="settings-list">
                 <div>
-                  <dt>Vault</dt>
+                  <dt>仓库</dt>
                   <dd>{compactPath(apiMeta.vaultRoot)}</dd>
                 </div>
                 <div>
-                  <dt>Codex skills</dt>
+                  <dt>Codex 技能</dt>
                   <dd>{compactPath(apiMeta.codexHome)}/skills</dd>
                 </div>
                 <div>
-                  <dt>API</dt>
+                  <dt>接口</dt>
                   <dd>{apiStatusLabel(apiStatus)}</dd>
                 </div>
               </dl>
@@ -1802,7 +1717,7 @@ export default function App() {
           <form className="install-panel" onSubmit={handleInstall}>
             <div className="install-head">
               <div>
-                <small>GitHub source</small>
+                <small>GitHub 来源</small>
                 <h2>安装 Skill</h2>
               </div>
               <button
@@ -1836,7 +1751,7 @@ export default function App() {
       ) : null}
 
       {toast ? (
-        <div className="toast" role="status" onAnimationEnd={() => setToast("")}>
+        <div className="toast" role="status">
           {toast}
         </div>
       ) : null}
@@ -1844,190 +1759,6 @@ export default function App() {
   );
 }
 
-function GuidePage({ activeStep, activeStepIndex, steps, onSelectStep, onEnter }) {
-  const progress = `${((activeStepIndex + 1) / steps.length) * 100}%`;
-  const missionCopy = {
-    find: "SCAN LOCAL INDEX",
-    install: "LOCK GITHUB SOURCE",
-    sync: "VERIFY UPDATE QUEUE",
-  };
-
-  function handlePointerMove(event) {
-    const { currentTarget, clientX, clientY, target } = event;
-    const width = currentTarget.clientWidth || 1;
-    const height = currentTarget.clientHeight || 1;
-    const tiltX = ((clientY / height) - 0.5) * -4;
-    const tiltY = ((clientX / width) - 0.5) * 5;
-    const selectableTarget = findReticleTarget(currentTarget, target, clientX, clientY);
-
-    currentTarget.style.setProperty("--pointer-x", `${Math.round(clientX)}px`);
-    currentTarget.style.setProperty("--pointer-y", `${Math.round(clientY)}px`);
-    currentTarget.style.setProperty("--tilt-x", `${tiltX.toFixed(2)}deg`);
-    currentTarget.style.setProperty("--tilt-y", `${tiltY.toFixed(2)}deg`);
-    currentTarget.dataset.reticleHit =
-      selectableTarget && currentTarget.contains(selectableTarget) ? "true" : "false";
-  }
-
-  function handlePointerLeave(event) {
-    event.currentTarget.style.setProperty("--pointer-x", "50vw");
-    event.currentTarget.style.setProperty("--pointer-y", "50vh");
-    event.currentTarget.style.setProperty("--tilt-x", "0deg");
-    event.currentTarget.style.setProperty("--tilt-y", "0deg");
-    event.currentTarget.dataset.reticleHit = "false";
-  }
-
-  return (
-    <main
-      className="guide-shell"
-      aria-label="Skill manager guide"
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
-    >
-      <video
-        className="guide-video"
-        data-testid="guide-video"
-        src="/media/coding-technology-bg.mp4"
-        poster="/media/coding-technology-poster.jpg"
-        autoPlay
-        muted
-        loop
-        playsInline
-        aria-hidden="true"
-      />
-      <div className="guide-scrim" aria-hidden="true" />
-      <div className="guide-noise" aria-hidden="true" />
-      <div className="guide-depth-field" data-testid="guide-game-layer" aria-hidden="true">
-        <span className="guide-node guide-node-a" />
-        <span className="guide-node guide-node-b" />
-        <span className="guide-node guide-node-c" />
-        <span className="guide-node guide-node-d" />
-      </div>
-      <div className="guide-reticle" data-testid="guide-reticle" aria-hidden="true" />
-
-      <header className="guide-topbar">
-        <div className="guide-brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Sparkle size={18} />
-          </span>
-          <div>
-            <strong>Skill Deck</strong>
-            <small>Local Codex</small>
-          </div>
-        </div>
-        <button className="guide-enter guide-enter-top" type="button" onClick={onEnter}>
-          进入管理台
-          <ArrowRight size={18} />
-        </button>
-      </header>
-
-      <section className="guide-layout">
-        <div className="guide-hero">
-          <h1>Skill Coverage</h1>
-          <p className="guide-lede">把本地 skills 变成一个能查、能装、能同步的导引式控制台。</p>
-
-          <div className="guide-progress" aria-hidden="true">
-            <span style={{ width: progress }} />
-          </div>
-
-          <div className="guide-steps" aria-label="Guide steps">
-            {steps.map((step) => (
-              <button
-                className={activeStep.id === step.id ? "guide-step active" : "guide-step"}
-                key={step.id}
-                type="button"
-                aria-label={step.actionLabel}
-                aria-pressed={activeStep.id === step.id}
-                onClick={() => onSelectStep(step.id)}
-              >
-                <span className="guide-step-code">{step.number} {step.label}</span>
-                <span>{step.title}</span>
-                <ArrowRight size={28} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <aside className="guide-preview" data-step={activeStep.id} aria-label={`${activeStep.label} preview`}>
-          <div className="guide-preview-head">
-            <span>{activeStep.number}</span>
-            <strong>{activeStep.label}</strong>
-          </div>
-          <p>{activeStep.detail}</p>
-          <GuidePreviewContent key={activeStep.id} step={activeStep.id} />
-        </aside>
-      </section>
-
-      <aside className="guide-mission" aria-label="Guide mission panel">
-        <span>MISSION</span>
-        <strong>COMBO x{activeStepIndex + 1}</strong>
-        <small>{missionCopy[activeStep.id]}</small>
-        <div className="guide-mission-track" aria-hidden="true">
-          <i style={{ width: progress }} />
-        </div>
-      </aside>
-
-      <div className="guide-command-strip" aria-hidden="true">
-        <span>FIND</span>
-        <span>INSTALL</span>
-        <span>SYNC</span>
-        <span>LOCAL</span>
-        <span>SKILL</span>
-      </div>
-    </main>
-  );
-}
-
-function GuidePreviewContent({ step }) {
-  if (step === "install") {
-    return (
-      <div className="guide-preview-card">
-        <span className="guide-preview-status">INSTALL READY</span>
-        <label className="guide-preview-field">
-          <span>GitHub URL</span>
-          <input value="github.com/openclaw/skills/nihongy" readOnly />
-        </label>
-        <div className="guide-preview-row active">
-          <GitBranch size={18} />
-          <span>nihongy skill</span>
-          <strong>ready</strong>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "sync") {
-    return (
-      <div className="guide-preview-card">
-        <span className="guide-preview-status">UPDATE QUEUE</span>
-        <div className="guide-preview-row active">
-          <RefreshCw size={18} />
-          <span>frontend-app-builder</span>
-          <strong>update</strong>
-        </div>
-        <div className="guide-preview-row">
-          <CheckCircle2 size={18} />
-          <span>skill-installer</span>
-          <strong>synced</strong>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="guide-preview-card">
-      <span className="guide-preview-status">SCAN FIELD</span>
-      <label className="guide-preview-field">
-        <span>Search</span>
-        <input value="paper / japanese / frontend" readOnly />
-      </label>
-      <div className="guide-preview-row active">
-        <Search size={18} />
-        <span>academic-paper-composer</span>
-        <strong>local</strong>
-      </div>
-    </div>
-  );
-}
 
 function PresetStudio({
   basePreset,
@@ -2124,7 +1855,7 @@ function PresetStudio({
       <aside className="view-card preset-list-panel">
         <div className="view-card-head compact">
           <div>
-            <span>Preset Studio</span>
+            <span>预设工作台</span>
             <strong>任务预设</strong>
           </div>
           <button className="icon-button dark" type="button" onClick={onCreatePreset} aria-label="新建预设">
@@ -2172,7 +1903,7 @@ function PresetStudio({
           </div>
           <div className="preset-editor-meter">
             <strong>{activeCount}</strong>
-            <span>/{selectedCount} active</span>
+            <span>/{selectedCount} 激活</span>
           </div>
         </div>
 
@@ -2282,10 +2013,10 @@ function PresetStudio({
       <section className="view-card preset-skill-picker" aria-label="分类文件夹选择">
         <div className="view-card-head compact">
           <div>
-            <span>Folder Picker</span>
-            <strong>{activeFolder ? `${activeFolder.name} skills` : "分类文件夹"}</strong>
+            <span>分类选择</span>
+            <strong>{activeFolder ? `${activeFolder.name} 技能` : "分类文件夹"}</strong>
           </div>
-          <em>{activeFolder ? `${visibleSkillOptions.length} skills` : `${pickerFolders.length} folders`}</em>
+          <em>{activeFolder ? `${visibleSkillOptions.length} 个技能` : `${pickerFolders.length} 个分类`}</em>
         </div>
 
         <label className="search-box preset-search">
@@ -2331,7 +2062,7 @@ function PresetStudio({
                     <span className="preset-skill-copy">
                       <strong>{skill.name}</strong>
                       <small>
-                        {skill.categoryName} · {skill.enabled ? "已激活" : "Vault"} · {inherited ? "通用场景" : skill.source}
+                        {skill.categoryName} · {skill.enabled ? "已激活" : "仓库内"} · {inherited ? "通用场景" : skill.source}
                       </small>
                     </span>
                     {inherited ? <em>通用</em> : null}
@@ -2356,7 +2087,7 @@ function PresetStudio({
                 <strong>{folder.count}</strong>
                 <small>
                   {folder.inheritedCount ? `${folder.inheritedCount} 通用 · ` : ""}
-                  {folder.selectedCount} 自选 · {folder.activeCount} active
+                  {folder.selectedCount} 自选 · {folder.activeCount} 激活
                 </small>
                 <ChevronRight size={16} />
               </button>
@@ -2422,7 +2153,7 @@ function SkillSection({
               </button>
             </>
           ) : (
-            <span className="zone-mode-chip">{label.includes("未激活") ? "standby" : "ready"}</span>
+            <span className="zone-mode-chip">{label.includes("未激活") ? "待命" : "就绪"}</span>
           )}
         </div>
       </div>
@@ -2503,9 +2234,9 @@ function SkillFileCard({
       </button>
       <div className="skill-file-meta">
         <label className="file-group-select">
-          <span>Group</span>
+          <span>归类</span>
           <select
-            aria-label={`Move ${skill.name} to group`}
+            aria-label={`将 ${skill.name} 归类到`}
             value={skill.categoryId}
             disabled={pending}
             onChange={(event) => {
@@ -2535,297 +2266,3 @@ function SkillFileCard({
   );
 }
 
-function buildPresetSummaries(presets, skills) {
-  const skillMap = new Map(skills.map((skill) => [skill.id, skill]));
-
-  return presets.map((preset) => {
-    const storedIds = resolvePresetSkillIds(preset, presets);
-    const skillIds = storedIds.filter((skillId) => skillMap.has(skillId));
-    return {
-      ...preset,
-      activeCount: skillIds.filter((skillId) => skillMap.get(skillId)?.enabled).length,
-      missingCount: storedIds.length - skillIds.length,
-      skillIds,
-    };
-  });
-}
-
-function buildSidebarHealthSummary(skillAudits, skills) {
-  const audits = Object.values(skillAudits);
-  const countWarn = (key) =>
-    audits.filter((audit) => audit.items.some((item) => item.key === key && item.tone === "warn")).length;
-
-  return {
-    issueCount: audits.reduce((total, audit) => total + audit.issueCount, 0),
-    missingTriggerCount: countWarn("triggers"),
-    conflictCount: countWarn("conflicts"),
-    updateCount: skills.filter((skill) => skill.status === "update").length,
-    syncedCount: skills.filter((skill) => skill.enabled).length,
-  };
-}
-
-function filterPresetSkillOptions(skills, query) {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return skills;
-
-  return skills.filter((skill) => {
-    const haystack = [
-      skill.id,
-      skill.name,
-      skill.description,
-      skill.source,
-      skill.categoryId,
-      skill.categoryName,
-      skill.path,
-      ...(skill.triggers ?? []),
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(normalizedQuery);
-  });
-}
-
-function seedTaskPresets() {
-  const storedPresets = readStoredTaskPresets();
-  return ensureBasePreset(storedPresets.length ? storedPresets : defaultTaskPresets);
-}
-
-function readStoredTaskPresets() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const raw = window.localStorage?.getItem(PRESET_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeTaskPreset).filter((preset) => preset.id && preset.name);
-  } catch {
-    return [];
-  }
-}
-
-function persistTaskPresets(presets) {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage?.setItem(
-      PRESET_STORAGE_KEY,
-      JSON.stringify(presets.map(normalizeTaskPreset)),
-    );
-  } catch {
-    // Local storage is best-effort; live skill operations should not fail because persistence is blocked.
-  }
-}
-
-function normalizeTaskPreset(preset) {
-  return {
-    color: typeof preset?.color === "string" && preset.color ? preset.color : "#111111",
-    description: typeof preset?.description === "string" ? preset.description : "",
-    id: typeof preset?.id === "string" && preset.id ? preset.id : `preset-${Date.now()}`,
-    mode: preset?.mode === "focus" ? "focus" : "merge",
-    name: typeof preset?.name === "string" && preset.name.trim() ? preset.name.trim() : "未命名预设",
-    skillIds: normalizeSkillIds(preset?.skillIds),
-  };
-}
-
-function normalizeSkillIds(skillIds) {
-  return [...new Set((Array.isArray(skillIds) ? skillIds : []).filter(Boolean).map(String))];
-}
-
-function ensureBasePreset(presets) {
-  const normalizedPresets = (Array.isArray(presets) ? presets : []).map(normalizeTaskPreset);
-  const basePreset = normalizeTaskPreset(defaultTaskPresets.find((preset) => preset.id === BASE_PRESET_ID));
-  const hasBasePreset = normalizedPresets.some((preset) => preset.id === BASE_PRESET_ID);
-  const withBase = hasBasePreset ? normalizedPresets : [basePreset, ...normalizedPresets];
-
-  return [
-    ...withBase.filter((preset) => preset.id === BASE_PRESET_ID),
-    ...withBase.filter((preset) => preset.id !== BASE_PRESET_ID),
-  ];
-}
-
-function resolveInheritedPresetSkillIds(preset, presets) {
-  const basePreset = presets.find((item) => item.id === BASE_PRESET_ID);
-  if (!preset || !basePreset || preset.id === BASE_PRESET_ID || preset.mode !== "merge") return [];
-  return normalizeSkillIds(basePreset.skillIds);
-}
-
-function resolvePresetSkillIds(preset, presets) {
-  if (!preset) return [];
-  return normalizeSkillIds([...resolveInheritedPresetSkillIds(preset, presets), ...normalizeSkillIds(preset.skillIds)]);
-}
-
-function buildSkillAudits(skills) {
-  const triggerOwners = new Map();
-  for (const skill of skills) {
-    for (const trigger of skill.triggers ?? []) {
-      const key = String(trigger).trim().toLowerCase();
-      if (!key) continue;
-      triggerOwners.set(key, [...(triggerOwners.get(key) ?? []), skill.id]);
-    }
-  }
-
-  return Object.fromEntries(
-    skills.map((skill) => {
-      const conflictTriggers = (skill.triggers ?? []).filter((trigger) => {
-        const owners = triggerOwners.get(String(trigger).trim().toLowerCase()) ?? [];
-        return owners.length > 1;
-      });
-      const items = [
-        {
-          key: "description",
-          label: (skill.description ?? "").trim().length >= 12 ? "描述完整" : "描述偏短",
-          tone: (skill.description ?? "").trim().length >= 12 ? "ok" : "warn",
-        },
-        {
-          key: "triggers",
-          label: (skill.triggers ?? []).length ? "触发词已设置" : "缺少触发词",
-          tone: (skill.triggers ?? []).length ? "ok" : "warn",
-        },
-        {
-          key: "conflicts",
-          label: conflictTriggers.length ? "触发词有冲突" : "触发词无冲突",
-          tone: conflictTriggers.length ? "warn" : "ok",
-        },
-        {
-          key: "sync",
-          label: skill.status === "update" ? "需要同步" : "同步正常",
-          tone: skill.status === "update" ? "warn" : "ok",
-        },
-      ];
-      const issueCount = items.filter((item) => item.tone === "warn").length;
-
-      return [
-        skill.id,
-        {
-          issueCount,
-          items,
-          score: Math.max(0, 100 - issueCount * 18),
-        },
-      ];
-    }),
-  );
-}
-
-function buildSkillMarkdown(skill) {
-  if (!skill) return "";
-  const triggers = (skill.triggers ?? []).map((trigger) => `"${escapeYamlValue(trigger)}"`).join(", ");
-
-  return [
-    "---",
-    `name: ${escapeYamlValue(skill.name)}`,
-    `description: ${escapeYamlValue(skill.description)}`,
-    `triggers: [${triggers}]`,
-    `version: ${escapeYamlValue(skill.version ?? "local")}`,
-    "---",
-    "",
-    `# ${skill.name}`,
-    "",
-    skill.description,
-    "",
-  ].join("\n");
-}
-
-function escapeYamlValue(value) {
-  return String(value ?? "").replaceAll("\"", "\\\"");
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function removeSelectedIds(current, ids) {
-  const remove = new Set(ids);
-  const next = new Set([...current].filter((id) => !remove.has(id)));
-  return next.size === current.size ? current : next;
-}
-
-function statusLabel(status) {
-  const labels = {
-    healthy: "正常",
-    update: "需更新",
-    available: "可安装",
-  };
-  return labels[status] ?? "未知";
-}
-
-function apiStatusLabel(status) {
-  const labels = {
-    connecting: "连接中",
-    live: "本地 API 在线",
-    offline: "离线演示",
-  };
-  return labels[status] ?? "未知";
-}
-
-function compactPath(value) {
-  return String(value ?? "")
-    .replaceAll("\\", "/")
-    .replace(/^C:\/Users\/[^/]+/i, "~");
-}
-
-function applyFrontendCategories(skills, categories) {
-  return skills.map((skill) => {
-    const categoryId = skill.categoryId ?? inferFrontendCategory(skill);
-    const category =
-      categories.find((item) => item.id === categoryId) ??
-      fallbackCategories.find((item) => item.id === categoryId) ??
-      fallbackCategories.at(-1);
-
-    return {
-      ...skill,
-      categoryId: category.id,
-      categoryColor: category.color,
-      categoryName: category.name,
-    };
-  });
-}
-
-function buildFolderCategories(categories, skills) {
-  const enriched = categories.map((category) => ({
-    ...category,
-    activeCount: skills.filter((skill) => skill.categoryId === category.id && skill.enabled).length,
-    count: skills.filter((skill) => skill.categoryId === category.id).length,
-  }));
-
-  return [
-    {
-      activeCount: skills.filter((skill) => skill.enabled).length,
-      color: "#111111",
-      count: skills.length,
-      id: "all",
-      name: "全部 Skills",
-    },
-    ...enriched,
-  ];
-}
-
-function inferFrontendCategory(skill) {
-  const haystack = [skill.id, skill.name, skill.description, skill.source, ...(skill.triggers ?? [])]
-    .join(" ")
-    .toLowerCase();
-
-  if (/paper|academic|thesis|论文|写作|composer|strategist/.test(haystack)) return "writing";
-  if (/front|ui|ux|web|react|browser|figma|design|前端|界面/.test(haystack)) return "frontend";
-  if (/debug|test|verify|review|tdd|调试|测试|验证/.test(haystack)) return "debugging";
-  if (/doc|pdf|sheet|slide|文档|表格/.test(haystack)) return "documents";
-  if (/agent|automation|workflow|github|linear|drive|dispatch|自动化/.test(haystack)) return "automation";
-  return "uncategorized";
-}
-
-function slugifyCategory(value) {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "") || `cat-${Date.now()}`
-  );
-}
-
-function categoryColor(categoryId) {
-  return (
-    [...fallbackCategories].find((category) => category.id === categoryId)?.color ??
-    "#71717a"
-  );
-}

@@ -6,6 +6,7 @@ import {
   assignSkillCategory,
   createCategory,
   deactivateSkill,
+  deleteSkill,
   exportManifest,
   installSkillFromGithub,
   listSkills,
@@ -108,6 +109,13 @@ async function routeRequest(request, response, url) {
       sendJson(response, await updateSkill(skillId));
       return;
     }
+  }
+
+  const skillDelete = url.pathname.match(/^\/api\/skills\/([^/]+)$/);
+  if (request.method === "DELETE" && skillDelete) {
+    const skillId = decodeURIComponent(skillDelete[1]);
+    sendJson(response, await deleteSkill(skillId));
+    return;
   }
 
   sendJson(

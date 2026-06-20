@@ -1,6 +1,36 @@
 :root {
-  color: #111111;
-  background: #070807;
+  /* Design Tokens */
+  --color-bg-deep: #070807;
+  --color-bg-guide: #050505;
+  --color-bg-surface: #f8f7f3;
+  --color-bg-card: #ffffff;
+  --color-bg-dark-panel: rgba(6, 6, 6, 0.78);
+  --color-bg-command-deck: rgba(8, 8, 8, 0.76);
+  --color-bg-workspace: rgba(245, 244, 239, 0.82);
+  --color-text-primary: #111111;
+  --color-text-secondary: #6b665d;
+  --color-text-tertiary: #77736a;
+  --color-text-light: #f7f6f2;
+  --color-text-muted: #9d9b94;
+  --color-text-label: #8b8983;
+  --color-accent-coral: #f26a4f;
+  --color-accent-mint: #77f2bf;
+  --color-accent-mint-dark: #0f8a5d;
+  --color-border-light: #e2ded4;
+  --color-border-medium: #d8d4ca;
+  --color-border-dark: rgba(17, 17, 17, 0.1);
+  --color-health-ok: #0d7c4a;
+  --color-health-warn: #d46828;
+  --color-danger: #ef4444;
+  --color-category-writing: #8b5cf6;
+  --color-category-frontend: #0ea5e9;
+  --color-category-automation: #10b981;
+  --color-category-debugging: #f97316;
+  --color-category-documents: #64748b;
+  --color-category-uncategorized: #71717a;
+
+  color: var(--color-text-primary);
+  background: var(--color-bg-deep);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     "Microsoft YaHei", sans-serif;

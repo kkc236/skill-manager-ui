@@ -31,6 +31,12 @@ export function deactivateVaultSkill(skillId) {
   });
 }
 
+export function deleteVaultSkill(skillId) {
+  return request(`/skills/${encodeURIComponent(skillId)}`, {
+    method: "DELETE",
+  });
+}
+
 export function updateVaultSkill(skillId) {
   return request(`/skills/${encodeURIComponent(skillId)}/update`, {
     method: "POST",

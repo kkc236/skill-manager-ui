@@ -119,6 +119,10 @@ export function removeSkill(skills, skillId) {
   );
 }
 
+export function deleteSkillFromVault(skills, skillId) {
+  return skills.filter((skill) => skill.id !== skillId);
+}
+
 export function buildManifest(skills) {
   return {
     exportedAt: new Date().toISOString(),

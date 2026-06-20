@@ -171,6 +171,31 @@ export async function deactivateSkill(id, options = {}) {
   return listSkills(options);
 }
 
+export async function deleteSkill(id, options = {}) {
+  const paths = getServicePaths(options);
+  await ensureRoots(paths);
+  const skillId = normalizeSkillId(id);
+  const codexDir = getCodexSkillDir(paths, skillId);
+  const vaultDir = getVaultSkillDir(paths, skillId);
+
+  await assertSkillExists(vaultDir, `Skill "${skillId}" is not in the project vault.`);
+  await rm(codexDir, { force: true, recursive: true });
+  await rm(vaultDir, { force: true, recursive: true });
+
+  const state = await loadState(paths);
+  ensureCategoryState(state);
+  delete state.assignments[skillId];
+  delete state.sources[skillId];
+  delete state.remotes[skillId];
+  recordActivity(state, {
+    detail: skillId,
+    title: "已从 Vault 删除",
+    tone: "warn",
+  });
+  await saveState(paths, state);
+  return listSkills(options);
+}
+
 export async function installSkillFromGithub(githubUrl, options = {}) {
   const paths = getServicePaths(options);
   await ensureRoots(paths);
