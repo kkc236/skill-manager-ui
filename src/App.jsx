@@ -2060,11 +2060,35 @@ function PresetStudio({
   const pending = batchPendingIds.size > 0;
   const folderQuery = presetQuery.trim().toLowerCase();
   const pickerFolders = useMemo(
-    () =>
-      folders
+    () => {
+      const skillIdsByFolder = new Map();
+      for (const skill of presetSkills) {
+        const list = skillIdsByFolder.get(skill.categoryId);
+        if (list) list.push(skill);
+        else skillIdsByFolder.set(skill.categoryId, [skill]);
+      }
+
+      return folders
         .filter((folder) => folder.id !== "all")
-        .filter((folder) => folder.count > 0 || !folderQuery)
-        .filter((folder) => (folderQuery ? folder.name.toLowerCase().includes(folderQuery) : true))
+        .filter((folder) => {
+          if (!folderQuery) return folder.count > 0;
+          const folderHaystack = [folder.id, folder.name].join(" ").toLowerCase();
+          if (folderHaystack.includes(folderQuery)) return true;
+          const folderSkills = skillIdsByFolder.get(folder.id) ?? [];
+          return folderSkills.some((skill) => {
+            const skillHaystack = [
+              skill.id,
+              skill.name,
+              skill.description,
+              skill.source,
+              skill.categoryId,
+              skill.categoryName,
+              skill.path,
+              ...(skill.triggers ?? []),
+            ].join(" ").toLowerCase();
+            return skillHaystack.includes(folderQuery);
+          });
+        })
         .map((folder) => ({
           ...folder,
           inheritedCount: presetSkills.filter(
@@ -2073,7 +2097,8 @@ function PresetStudio({
           selectedCount: presetSkills.filter(
             (skill) => skill.categoryId === folder.id && selectedPresetSkillSet.has(skill.id),
           ).length,
-        })),
+        }));
+    },
     [folderQuery, folders, presetSkills, selectedPresetInheritedSkillSet, selectedPresetSkillSet],
   );
   const activeFolder = pickerFolders.find((folder) => folder.id === pickerCategoryId);
