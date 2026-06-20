@@ -4,9 +4,18 @@ Skill Deck is a local Codex skill manager. The project keeps a persistent vault 
 
 ## Run
 
+For first-time setup on Windows, run:
+
 ```powershell
-corepack pnpm install
-corepack pnpm dev -- --port 5173
+.\scripts\install-skill-deck.ps1
+```
+
+This installs missing `node_modules` with `corepack pnpm install`, creates the Codex skills folder used by the app, and adds a `Skill Deck` shortcut to your desktop. It does not install Codex itself or upload/copy this computer's skills into GitHub.
+
+After that, launch Skill Deck from the desktop shortcut, or run:
+
+```powershell
+.\scripts\start-skill-deck.ps1
 ```
 
 Open `http://127.0.0.1:5173/`.

@@ -5,6 +5,9 @@ $AppUrl = "http://127.0.0.1:5173/"
 $HealthUrl = "http://127.0.0.1:5174/api/health"
 $LogDir = Join-Path $ProjectRoot ".logs"
 $LogPath = Join-Path $LogDir "skill-deck-dev.log"
+$BootstrapScript = Join-Path $PSScriptRoot "bootstrap.mjs"
+
+node $BootstrapScript
 
 function Test-LocalUrl {
   param([string]$Url)
