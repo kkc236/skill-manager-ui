@@ -130,21 +130,11 @@ const sourceLibraryItems = [
 const guideCompleteStorageKey = "skill-deck-guide-complete";
 
 function hasCompletedGuide() {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(guideCompleteStorageKey) === "true";
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 function rememberGuideComplete() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(guideCompleteStorageKey, "true");
-  } catch {
-    // The app still works when storage is unavailable; it just shows the guide again.
-  }
+  // Keep the cover as the first screen on each fresh load.
 }
 
 export default function App() {
@@ -1102,6 +1092,9 @@ export default function App() {
             <strong>Skill Deck</strong>
             <small>{t("brand.sub")}</small>
           </div>
+          <button className="locale-toggle" type="button" onClick={toggleLocale} aria-label={t("lang.switch")}>
+            {t("lang.switch")}
+          </button>
         </div>
 
         <nav className="nav-list">
@@ -1152,10 +1145,6 @@ export default function App() {
           <button className="ghost-button" type="button" onClick={() => loadInventory()}>
             <Archive size={15} />
             重新扫描
-          </button>
-          <button className="ghost-button locale-toggle" type="button" onClick={toggleLocale} aria-label={t("lang.switch")}>
-            <Settings2 size={15} />
-            {t("lang.switch")}
           </button>
         </section>
       </aside>
@@ -2261,7 +2250,7 @@ function SkillFileCard({
         <label className="file-group-select">
           <span>{t("card.group")}</span>
           <select
-            aria-label={`将 ${skill.name} 归类到`}
+            aria-label={`Move ${skill.name} to group`}
             value={skill.categoryId}
             disabled={pending}
             onChange={(event) => {

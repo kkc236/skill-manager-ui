@@ -30,7 +30,7 @@ describe("Skill Manager UI", () => {
     );
     expect(within(guide).getByTestId("guide-game-layer")).toBeInTheDocument();
     expect(within(guide).getByLabelText("Guide mission panel")).toBeInTheDocument();
-    expect(within(guide).getByRole("heading", { name: "Skill Coverage" })).toBeInTheDocument();
+    expect(within(guide).getByRole("heading", { name: "技能覆盖" })).toBeInTheDocument();
     expect(within(guide).getByText("01 FIND")).toBeInTheDocument();
     expect(within(guide).getByText("02 INSTALL")).toBeInTheDocument();
     expect(within(guide).getByText("03 SYNC")).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe("Skill Manager UI", () => {
 
     await user.click(installStep);
     expect(installStep).toHaveAttribute("aria-pressed", "true");
-    expect(within(guide).getByText("GitHub URL")).toBeInTheDocument();
+    expect(within(guide).getByText("GitHub 地址")).toBeInTheDocument();
 
     const syncStep = within(guide).getByRole("button", { name: "Preview sync step" });
     const syncRect = vi.spyOn(syncStep, "getBoundingClientRect").mockReturnValue({
@@ -71,7 +71,7 @@ describe("Skill Manager UI", () => {
 
     await user.click(syncStep);
     expect(syncStep).toHaveAttribute("aria-pressed", "true");
-    expect(within(guide).getByText("UPDATE QUEUE")).toBeInTheDocument();
+    expect(within(guide).getByText("更新队列")).toBeInTheDocument();
 
     await enterConsole(user);
     expect(screen.getByLabelText("Skill 列表")).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("Skill Manager UI", () => {
     await user.click(screen.getByRole("button", { name: "封面" }));
 
     const guide = screen.getByLabelText("Skill manager guide");
-    expect(within(guide).getByRole("heading", { name: "Skill Coverage" })).toBeInTheDocument();
+    expect(within(guide).getByRole("heading", { name: "技能覆盖" })).toBeInTheDocument();
 
     await enterConsole(user);
     expect(screen.getByLabelText("Skill 列表")).toBeInTheDocument();
@@ -243,7 +243,7 @@ describe("Skill Manager UI", () => {
     const studio = screen.getByTestId("preset-studio");
 
     expect(within(studio).getByLabelText("分类文件夹选择")).toBeInTheDocument();
-    expect(within(studio).getByText("Folder Picker")).toBeInTheDocument();
+    expect(within(studio).getByText("分类选择")).toBeInTheDocument();
     expect(within(studio).getByText("分类文件夹")).toBeInTheDocument();
     expect(within(studio).queryByText("跨分类选择")).not.toBeInTheDocument();
     expect(within(studio).getAllByText("通用场景").length).toBeGreaterThan(0);
@@ -256,12 +256,12 @@ describe("Skill Manager UI", () => {
     await user.selectOptions(within(studio).getByLabelText("应用模式"), "merge");
 
     await user.click(within(studio).getByRole("button", { name: "打开分类 论文写作" }));
-    expect(within(studio).getByText("论文写作 skills")).toBeInTheDocument();
+    expect(within(studio).getByText("论文写作 个技能")).toBeInTheDocument();
     await user.click(within(studio).getByLabelText("选择 academic-paper-composer"));
     await user.click(within(studio).getByRole("button", { name: "返回分类文件夹" }));
 
     await user.click(within(studio).getByRole("button", { name: "打开分类 调试测试" }));
-    expect(within(studio).getByText("调试测试 skills")).toBeInTheDocument();
+    expect(within(studio).getByText("调试测试 个技能")).toBeInTheDocument();
     await user.click(within(studio).getByLabelText("选择 systematic-debugging"));
 
     expect(within(screen.getByTestId("preset-selected-skills")).getByText("academic-paper-composer")).toBeInTheDocument();
@@ -274,9 +274,11 @@ describe("Skill Manager UI", () => {
 
     await user.click(within(studio).getByRole("button", { name: "应用预设" }));
     expect(within(screen.getByTestId("sidebar-preset-summary")).getByText("论文 + 调试")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("已激活到 Codex")).getByText("academic-paper-composer")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("已激活到 Codex")).getByText("systematic-debugging")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("已激活到 Codex")).getByText("test-driven-development")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "技能库" }));
+    const activeZone = screen.getByLabelText(/已激活到/i);
+    expect(within(activeZone).getByText("academic-paper-composer")).toBeInTheDocument();
+    expect(within(activeZone).getByText("systematic-debugging")).toBeInTheDocument();
+    expect(within(activeZone).getByText("test-driven-development")).toBeInTheDocument();
   });
 
   it("shows skill health checks and lets users save a skill markdown draft", async () => {
@@ -367,7 +369,7 @@ describe("Skill Manager UI", () => {
     await user.click(within(screen.getByLabelText("Vault 未激活")).getByLabelText("选择 frontend-app-builder"));
 
     const bulkBar = screen.getByLabelText("Bulk action bar");
-    expect(within(bulkBar).getByText("1 selected")).toBeInTheDocument();
+    expect(within(bulkBar).getByText((_, element) => element?.textContent === "1 已选")).toBeInTheDocument();
 
     await user.click(within(bulkBar).getByRole("button", { name: "Activate selected skills" }));
 
