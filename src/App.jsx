@@ -1345,6 +1345,7 @@ export default function App() {
                 pendingSkillIds={batchPendingIds}
                 onToggle={handleToggle}
                 isSkillPending={isSkillPending}
+                t={t}
               />
               <SkillSection
                 label="Vault 未激活"
@@ -1363,6 +1364,7 @@ export default function App() {
                 pendingSkillIds={batchPendingIds}
                 onToggle={handleToggle}
                 isSkillPending={isSkillPending}
+                t={t}
               />
             </div>
           </section>
@@ -2136,6 +2138,7 @@ function SkillSection({
   selectedId,
   selectedSkillIds,
   skills,
+  t,
 }) {
   const selectedIds = skills.filter((skill) => selectedSkillIds.has(skill.id)).map((skill) => skill.id);
   const allSelected = skills.length > 0 && selectedIds.length === skills.length;
@@ -2191,6 +2194,7 @@ function SkillSection({
             categories={categories}
             onSelectionChange={onSelectionChange}
             onToggle={onToggle}
+            t={t}
           />
         ))}
         {skills.length === 0 ? (
@@ -2215,6 +2219,7 @@ function SkillFileCard({
   selected,
   selectedForBatch,
   skill,
+  t,
 }) {
   const className = [
     "skill-file",
