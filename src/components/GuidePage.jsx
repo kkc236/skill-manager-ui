@@ -36,9 +36,9 @@ function findReticleTarget(root, eventTarget, clientX, clientY) {
 
 export { guideSteps };
 
-export default function GuidePage({ activeStep, activeStepIndex, steps, onSelectStep, onEnter }) {
+export default function GuidePage({ activeStep, activeStepIndex, steps, onSelectStep, onEnter, t }) {
   const progress = `${((activeStepIndex + 1) / steps.length) * 100}%`;
-  const missionCopy = { find: "扫描本地索引", install: "锁定 GitHub 源", sync: "验证更新队列" };
+  const missionCopy = { find: t ? t("guide.scanLocalIndex") : "扫描本地索引", install: t ? t("guide.lockGithubSource") : "锁定 GitHub 源", sync: t ? t("guide.verifyUpdateQueue") : "验证更新队列" };
 
   function handlePointerMove(event) {
     const { currentTarget, clientX, clientY, target } = event;
@@ -74,14 +74,14 @@ export default function GuidePage({ activeStep, activeStepIndex, steps, onSelect
       <header className="guide-topbar">
         <div className="guide-brand">
           <span className="brand-mark" aria-hidden="true"><Sparkle size={18} /></span>
-          <div><strong>Skill Deck</strong><small>本地 Codex</small></div>
+          <div><strong>Skill Deck</strong><small>{t ? t("brand.sub") : "本地 Codex"}</small></div>
         </div>
-        <button className="guide-enter guide-enter-top" type="button" onClick={onEnter}>进入管理台 <ArrowRight size={18} /></button>
+        <button className="guide-enter guide-enter-top" type="button" onClick={onEnter}>{t ? t("guide.enterConsole") : "进入管理台"} <ArrowRight size={18} /></button>
       </header>
       <section className="guide-layout">
         <div className="guide-hero">
-          <h1>技能覆盖</h1>
-          <p className="guide-lede">把本地技能变成一个能查、能装、能同步的导引式控制台。</p>
+          <h1>{t ? t("guide.skillCoverage") : "技能覆盖"}</h1>
+          <p className="guide-lede">{t ? t("guide.lede") : "把本地技能变成一个能查、能装、能同步的导引式控制台。"}</p>
           <div className="guide-progress" aria-hidden="true"><span style={{ width: progress }} /></div>
           <div className="guide-steps" aria-label="Guide steps">
             {steps.map((step) => (
@@ -94,20 +94,20 @@ export default function GuidePage({ activeStep, activeStepIndex, steps, onSelect
         <aside className="guide-preview" data-step={activeStep.id} aria-label={`${activeStep.label} preview`}>
           <div className="guide-preview-head"><span>{activeStep.number}</span><strong>{activeStep.label}</strong></div>
           <p>{activeStep.detail}</p>
-          <GuidePreviewContent key={activeStep.id} step={activeStep.id} />
+          <GuidePreviewContent key={activeStep.id} step={activeStep.id} t={t} />
         </aside>
       </section>
       <aside className="guide-mission" aria-label="Guide mission panel">
-        <span>任务</span><strong>COMBO x{activeStepIndex + 1}</strong><small>{missionCopy[activeStep.id]}</small>
+        <span>{t ? t("guide.mission") : "任务"}</span><strong>COMBO x{activeStepIndex + 1}</strong><small>{missionCopy[activeStep.id]}</small>
         <div className="guide-mission-track" aria-hidden="true"><i style={{ width: progress }} /></div>
       </aside>
-      <div className="guide-command-strip" aria-hidden="true"><span>扫描</span><span>安装</span><span>同步</span><span>本地</span><span>技能</span></div>
+      <div className="guide-command-strip" aria-hidden="true"><span>{t ? t("guide.scan") : "扫描"}</span><span>{t ? t("guide.install") : "安装"}</span><span>{t ? t("guide.sync") : "同步"}</span><span>{t ? t("guide.local") : "本地"}</span><span>{t ? t("guide.skill") : "技能"}</span></div>
     </main>
   );
 }
 
-function GuidePreviewContent({ step }) {
-  if (step === "install") return (<div className="guide-preview-card"><span className="guide-preview-status">安装就绪</span><label className="guide-preview-field"><span>GitHub 地址</span><input value="github.com/openclaw/skills/nihongy" readOnly /></label><div className="guide-preview-row active"><GitBranch size={18} /><span>nihongy 技能</span><strong>就绪</strong></div></div>);
-  if (step === "sync") return (<div className="guide-preview-card"><span className="guide-preview-status">更新队列</span><div className="guide-preview-row active"><RefreshCw size={18} /><span>frontend-app-builder</span><strong>更新</strong></div><div className="guide-preview-row"><CheckCircle2 size={18} /><span>skill-installer</span><strong>已同步</strong></div></div>);
-  return (<div className="guide-preview-card"><span className="guide-preview-status">扫描区域</span><label className="guide-preview-field"><span>搜索</span><input value="paper / japanese / frontend" readOnly /></label><div className="guide-preview-row active"><Search size={18} /><span>academic-paper-composer</span><strong>本地</strong></div></div>);
+function GuidePreviewContent({ step, t }) {
+  if (step === "install") return (<div className="guide-preview-card"><span className="guide-preview-status">{t ? t("guide.installReady") : "安装就绪"}</span><label className="guide-preview-field"><span>{t ? t("guide.githubAddress") : "GitHub 地址"}</span><input value="github.com/openclaw/skills/nihongy" readOnly /></label><div className="guide-preview-row active"><GitBranch size={18} /><span>nihongy skill</span><strong>{t ? t("guide.ready") : "就绪"}</strong></div></div>);
+  if (step === "sync") return (<div className="guide-preview-card"><span className="guide-preview-status">{t ? t("guide.updateQueue") : "更新队列"}</span><div className="guide-preview-row active"><RefreshCw size={18} /><span>frontend-app-builder</span><strong>{t ? t("guide.update") : "更新"}</strong></div><div className="guide-preview-row"><CheckCircle2 size={18} /><span>skill-installer</span><strong>{t ? t("guide.synced") : "已同步"}</strong></div></div>);
+  return (<div className="guide-preview-card"><span className="guide-preview-status">{t ? t("guide.scanField") : "扫描区域"}</span><label className="guide-preview-field"><span>{t ? t("guide.search") : "搜索"}</span><input value="paper / japanese / frontend" readOnly /></label><div className="guide-preview-row active"><Search size={18} /><span>academic-paper-composer</span><strong>{t ? t("guide.localLabel") : "本地"}</strong></div></div>);
 }

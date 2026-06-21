@@ -48,29 +48,37 @@ import { BASE_PRESET_ID, defaultTaskPresets, seedTaskPresets, persistTaskPresets
 import { buildSkillAudits, buildSidebarHealthSummary, buildSkillMarkdown, clamp, removeSelectedIds, statusLabel, apiStatusLabel, compactPath } from "./utils/helpers";
 import GuidePage, { guideSteps } from "./components/GuidePage";
 import { useToast } from "./hooks/useToast";
+import { useLocale } from "./hooks/useLocale";
 
-const filterTabs = [
-  { id: "all", label: "全部" },
-  { id: "enabled", label: "已激活" },
-  { id: "inactive", label: "未激活" },
-  { id: "updates", label: "需同步" },
-];
+function buildFilterTabs(t) {
+  return [
+    { id: "all", label: t("filter.all") },
+    { id: "enabled", label: t("filter.enabled") },
+    { id: "inactive", label: t("filter.inactive") },
+    { id: "updates", label: t("filter.updates") },
+  ];
+}
 
-const navItems = [  { id: "cover", label: "封面", icon: Sparkle },
-  { id: "library", label: "技能库", icon: Layers3 },
-  { id: "presets", label: "预设", icon: Bolt },
-  { id: "install", label: "安装源", icon: GitBranch },
-  { id: "manifest", label: "清单", icon: FileJson },
-  { id: "settings", label: "设置", icon: Settings2 },
-];
+function buildNavItems(t) {
+  return [
+    { id: "cover", label: t("nav.cover"), icon: Sparkle },
+    { id: "library", label: t("nav.library"), icon: Layers3 },
+    { id: "presets", label: t("nav.presets"), icon: Bolt },
+    { id: "install", label: t("nav.install"), icon: GitBranch },
+    { id: "manifest", label: t("nav.manifest"), icon: FileJson },
+    { id: "settings", label: t("nav.settings"), icon: Settings2 },
+  ];
+}
 
-const viewTitles = {
-  install: "安装源",
-  library: "技能库",
-  presets: "场景预设",
-  manifest: "Skill 清单",
-  settings: "控制台设置",
-};
+function buildViewTitles(t) {
+  return {
+    install: t("title.install"),
+    library: t("title.library"),
+    presets: t("title.presets"),
+    manifest: t("title.manifest"),
+    settings: t("title.settings"),
+  };
+}
 
 const materialLibraries = [
   {
@@ -101,21 +109,21 @@ const sourceLibraryItems = [
     name: "Frontend launch pack",
     note: "前端开发、React 规范、浏览器 QA 与视觉调试。",
     url: "https://github.com/openai/openai-cookbook",
-    badge: "推荐",
+    badgeKey: "badge.recommended",
   },
   {
     id: "paper-pack",
     name: "Academic writing pack",
     note: "论文规划、定稿、文档处理、PDF 校验组合。",
     url: "https://github.com/openai/openai-cookbook",
-    badge: "场景包",
+    badgeKey: "badge.scenePack",
   },
   {
     id: "debug-pack",
     name: "Debugging toolkit",
     note: "系统调试、TDD、验证、代码审查工作流。",
     url: "https://github.com/openai/openai-cookbook",
-    badge: "可更新",
+    badgeKey: "badge.updatable",
   },
 ];
 
@@ -174,6 +182,11 @@ export default function App() {
   const [githubUrl, setGithubUrl] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const { toast, showToast: setToast, clearToast } = useToast();
+  const { locale, toggleLocale, t } = useLocale();
+
+  const filterTabs = useMemo(() => buildFilterTabs(t), [t]);
+  const navItems = useMemo(() => buildNavItems(t), [t]);
+  const viewTitles = useMemo(() => buildViewTitles(t), [t]);
   const fileInputRef = useRef(null);
   const readerResizeRef = useRef(null);
   const workbenchRef = useRef(null);
@@ -1053,6 +1066,7 @@ export default function App() {
         steps={guideSteps}
         onSelectStep={setGuideStepId}
         onEnter={handleEnterConsole}
+        t={t}
       />
     );
   }
@@ -1086,7 +1100,7 @@ export default function App() {
           </span>
           <div>
             <strong>Skill Deck</strong>
-            <small>本地 Codex</small>
+            <small>{t("brand.sub")}</small>
           </div>
         </div>
 
@@ -1111,19 +1125,19 @@ export default function App() {
 
         <section className="sidebar-preset-summary" aria-label="当前场景预设" data-testid="sidebar-preset-summary">
           <div className="sidebar-section-head">
-            <span>预设</span>
-            <strong>当前预设</strong>
+            <span>{t("sidebar.preset")}</span>
+            <strong>{t("sidebar.currentPreset")}</strong>
           </div>
           <div className="preset-summary-orb" aria-hidden="true">
             <Bolt size={18} />
           </div>
-          <strong>{activePresetSummary?.name ?? selectedPreset?.name ?? "未应用"}</strong>
+          <strong>{activePresetSummary?.name ?? selectedPreset?.name ?? t("sidebar.notApplied")}</strong>
           <small>
             {activePresetSummary
-              ? `${activePresetSummary.activeCount}/${activePresetSummary.skillIds.length} 个技能 · ${
-                  activePresetSummary.mode === "focus" ? "专注" : "叠加"
+              ? `${activePresetSummary.activeCount}/${activePresetSummary.skillIds.length} ${t("sidebar.skillsUnit")} · ${
+                  activePresetSummary.mode === "focus" ? t("sidebar.focus") : t("sidebar.merge")
                 }`
-              : "自定义任务场景，按分类文件夹挑选 skills"}
+              : t("sidebar.presetHint")}
           </small>
           <button className="ghost-button" type="button" onClick={() => setActiveView("presets")}>
             <Bolt size={15} />
@@ -1132,12 +1146,16 @@ export default function App() {
         </section>
 
         <section className="sidebar-panel">
-          <p>项目仓库</p>
+          <p>{t("sidebar.projectVault")}</p>
           <strong title={apiMeta.vaultRoot}>{compactPath(apiMeta.vaultRoot)}</strong>
-          <small title={apiMeta.codexHome}>激活到 {compactPath(apiMeta.codexHome)}/skills</small>
+          <small title={apiMeta.codexHome}>{t("sidebar.activateTo")} {compactPath(apiMeta.codexHome)}/skills</small>
           <button className="ghost-button" type="button" onClick={() => loadInventory()}>
             <Archive size={15} />
             重新扫描
+          </button>
+          <button className="ghost-button locale-toggle" type="button" onClick={toggleLocale} aria-label={t("lang.switch")}>
+            <Settings2 size={15} />
+            {t("lang.switch")}
           </button>
         </section>
       </aside>
@@ -1188,26 +1206,26 @@ export default function App() {
             aria-hidden="true"
           />
           <div className="command-deck-copy">
-            <span>仓库命令</span>
-            <strong>{currentFolder?.name ?? "全部 Skills"}</strong>
-            <p>{query ? `搜索锁定 "${query}"` : "浏览、归类、激活和关闭都围绕当前文件夹进行。"}</p>
+            <span>{t("deck.label")}</span>
+            <strong>{currentFolder?.name ?? t("deck.allSkills")}</strong>
+            <p>{query ? `${t("deck.searchLock")} "${query}"` : t("deck.browseHint")}</p>
           </div>
           <div className="command-deck-stats" aria-label="Skill 状态概览">
             <span>
               <strong>{skillsWithCategories.length}</strong>
-              <small>总计</small>
+              <small>{t("deck.total")}</small>
             </span>
             <span>
               <strong>{enabledCount}</strong>
-              <small>激活</small>
+              <small>{t("deck.active")}</small>
             </span>
             <span>
               <strong>{inactiveCount}</strong>
-              <small>仓库</small>
+              <small>{t("deck.vault")}</small>
             </span>
             <span>
               <strong>{auditIssueCount}</strong>
-              <small>问题</small>
+              <small>{t("deck.issues")}</small>
             </span>
           </div>
           <button
@@ -1218,7 +1236,7 @@ export default function App() {
             onClick={handleBatchModeToggle}
           >
             <CheckCircle2 size={17} />
-            {batchMode ? "批量模式开启" : "批量模式"}
+            {batchMode ? t("deck.batchModeOn") : t("deck.batchMode")}
           </button>
           <div className="vault-hero-pulse" aria-hidden="true" />
         </section>
@@ -1244,8 +1262,8 @@ export default function App() {
           <aside className="folder-panel">
             <div className="folder-head">
               <div>
-                <span>Skill 文件夹</span>
-                <strong>{folderCategories.length} 组</strong>
+                <span>{t("folder.label")}</span>
+                <strong>{folderCategories.length} {t("folder.groups")}</strong>
               </div>
               <img src="/icons/tabler/folder-open.svg" alt="" aria-hidden="true" />
             </div>
@@ -1263,7 +1281,7 @@ export default function App() {
                   <img src={category.id === "all" ? "/icons/tabler/archive.svg" : "/icons/tabler/folder.svg"} alt="" />
                   <span>{category.name}</span>
                   <strong>{category.count}</strong>
-                  <small>{category.activeCount} 激活</small>
+                  <small>{category.activeCount} {t("folder.activeCount")}</small>
                 </button>
               ))}
             </div>
@@ -1284,7 +1302,7 @@ export default function App() {
           <section className="explorer-panel" aria-label="Skill 列表">
             <div className="explorer-toolbar">
               <div>
-                <span>技能浏览器</span>
+                <span>{t("explorer.label")}</span>
                 <strong>{currentFolder?.name ?? "全部 Skills"}</strong>
               </div>
               <label className="search-box explorer-search">
@@ -1292,7 +1310,7 @@ export default function App() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索 skill、来源或描述"
+                  placeholder={t("explorer.searchPlaceholder")}
                 />
               </label>
               <div className="filter-tabs explorer-filters" role="tablist" aria-label="Skill 过滤">
@@ -1402,7 +1420,7 @@ export default function App() {
                 <img src={selectedSkill?.enabled ? "/icons/tabler/file-check.svg" : "/icons/tabler/file-code.svg"} alt="" />
               </span>
               <div>
-                <small>技能检查 · {selectedSkill?.categoryName ?? selectedSkill?.source}</small>
+                <small>{t("inspector.label")} · {selectedSkill?.categoryName ?? selectedSkill?.source}</small>
                 <h2>{selectedSkill?.name}</h2>
               </div>
             </div>
@@ -1415,7 +1433,7 @@ export default function App() {
             >
               <div className="reader-toolbar">
                 <div>
-                  <span>阅读窗口</span>
+                  <span>{t("inspector.readerWindow")}</span>
                   <strong>{readerFocus === "skill" ? "SKILL.md" : "描述"}</strong>
                 </div>
                 <small>{readerHeight}px</small>
@@ -1425,7 +1443,7 @@ export default function App() {
                 <article className="reader-primary">
                   <div className="reader-pane-head">
                     <h3>{readerFocus === "skill" ? "SKILL.md" : "描述"}</h3>
-                    <span>主窗口</span>
+                    <span>{t("inspector.mainPane")}</span>
                   </div>
                   {readerFocus === "skill" ? (
                     <textarea
@@ -1461,14 +1479,14 @@ export default function App() {
                   onPointerDown={handleReaderResizeStart}
                 >
                   <span />
-                  <small>拖动</small>
+                  <small>{t("inspector.drag")}</small>
                 </button>
               </div>
             </section>
 
             <section className="health-panel" aria-label="健康检查">
               <div className="health-head">
-                <span>健康检查</span>
+                <span>{t("inspector.healthCheck")}</span>
                 <strong>{selectedAudit?.score ?? 0}</strong>
               </div>
               <div className="health-list">
@@ -1481,7 +1499,7 @@ export default function App() {
             </section>
 
             <label className="category-field">
-              <span>归类文件夹</span>
+              <span>{t("inspector.categoryField")}</span>
               <select
                 aria-label="归类文件夹"
                 value={selectedSkill?.categoryId ?? "uncategorized"}
@@ -1498,19 +1516,19 @@ export default function App() {
 
             <dl className="detail-list">
               <div>
-                <dt>激活状态</dt>
-                <dd>{selectedSkill?.enabled ? "已激活到 Codex" : "保留在 Vault"}</dd>
+                <dt>{t("inspector.activationStatus")}</dt>
+                <dd>{selectedSkill?.enabled ? t("inspector.activatedToCodex") : t("inspector.keptInVault")}</dd>
               </div>
               <div>
-                <dt>路径</dt>
+                <dt>{t("inspector.path")}</dt>
                 <dd>{selectedSkill?.path}</dd>
               </div>
               <div>
-                <dt>触发词</dt>
+                <dt>{t("inspector.triggers")}</dt>
                 <dd>{selectedSkill?.triggers?.join(" / ")}</dd>
               </div>
               <div>
-                <dt>最近更新</dt>
+                <dt>{t("inspector.lastUpdate")}</dt>
                 <dd>{selectedSkill?.updatedAt}</dd>
               </div>
             </dl>
@@ -1523,7 +1541,7 @@ export default function App() {
                 disabled={!selectedSkill || isSkillPending(selectedSkill?.id)}
               >
                 <Power size={17} />
-                {selectedSkill?.enabled ? "关闭" : "激活"}
+                {selectedSkill?.enabled ? t("inspector.deactivate") : t("inspector.activate")}
               </button>
               <button
                 className="secondary-button"
@@ -1581,13 +1599,14 @@ export default function App() {
             onSavePreset={handleSavePreset}
             onSelectPreset={setSelectedPresetId}
             onToggleSkill={handleTogglePresetSkill}
+            t={t}
           />
         ) : activeView === "install" ? (
           <section className="workspace-page source-workspace" aria-label="安装源工作区">
             <div className="view-card install-console">
               <div className="view-card-head">
                 <div>
-                  <span>GitHub 来源</span>
+                  <span>{t("install.githubSource")}</span>
                   <strong>下载安装到 Vault，并可立即激活到 Codex</strong>
                 </div>
                 <GitBranch size={24} />
@@ -1611,7 +1630,7 @@ export default function App() {
             <div className="view-card source-library" data-testid="source-library" aria-label="推荐 Skill 资源库">
               <div className="view-card-head compact">
                 <div>
-                  <span>资源库</span>
+                  <span>{t("install.resourceLibrary")}</span>
                   <strong>推荐包、收藏源和可更新提示</strong>
                 </div>
                 <PackageCheck size={22} />
@@ -1619,7 +1638,7 @@ export default function App() {
               <div className="source-library-grid">
                 {sourceLibraryItems.map((item) => (
                   <article className="source-library-card" key={item.id}>
-                    <span>{item.badge}</span>
+                    <span>{t(item.badgeKey)}</span>
                     <strong>{item.name}</strong>
                     <p>{item.note}</p>
                     <button className="secondary-button" type="button" onClick={() => setGithubUrl(item.url)}>
@@ -1631,7 +1650,7 @@ export default function App() {
               </div>
             </div>
             <div className="view-card compact-guide">
-              <span>安装逻辑</span>
+              <span>{t("install.installLogic")}</span>
               <strong>下载 → 放入本项目 Vault → 激活时复制到 Codex skills</strong>
               <p>安装源页面只保留一个主要动作，避免把“下载、归类、激活”揉成一堆按钮。</p>
             </div>
@@ -1641,7 +1660,7 @@ export default function App() {
             <div className="view-card manifest-card">
               <div className="view-card-head">
                 <div>
-                  <span>清单数据</span>
+                  <span>{t("manifest.data")}</span>
                   <strong>当前 skill 清单预览</strong>
                 </div>
                 <FileJson size={24} />
@@ -1665,8 +1684,8 @@ export default function App() {
             <div className="view-card settings-card">
               <div className="view-card-head">
                 <div>
-                  <span>本地路径</span>
-                  <strong>本地仓库与 Codex 目标路径</strong>
+                  <span>{t("settings.localPaths")}</span>
+                  <strong>{t("settings.pathsDescription")}</strong>
                 </div>
                 <Settings2 size={24} />
               </div>
@@ -1692,7 +1711,7 @@ export default function App() {
             <div className="view-card material-card">
               <div className="view-card-head">
                 <div>
-                  <span>素材库候选</span>
+                  <span>{t("settings.materialCandidates")}</span>
                   <strong>优先选许可清晰的抽象科技视频</strong>
                 </div>
                 <Sparkle size={24} />
@@ -1717,7 +1736,7 @@ export default function App() {
           <form className="install-panel" onSubmit={handleInstall}>
             <div className="install-head">
               <div>
-                <small>GitHub 来源</small>
+                <small>{t("install.githubSource")}</small>
                 <h2>安装 Skill</h2>
               </div>
               <button
@@ -1783,6 +1802,7 @@ function PresetStudio({
   selectedPresetSkillSet,
   selectedPresetSummary,
   summaries,
+  t,
 }) {
   const [pickerCategoryId, setPickerCategoryId] = useState("");
   const summaryMap = useMemo(() => new Map(summaries.map((summary) => [summary.id, summary])), [summaries]);
@@ -1855,8 +1875,8 @@ function PresetStudio({
       <aside className="view-card preset-list-panel">
         <div className="view-card-head compact">
           <div>
-            <span>预设工作台</span>
-            <strong>任务预设</strong>
+            <span>{t("preset.studio")}</span>
+            <strong>{t("preset.taskPresets")}</strong>
           </div>
           <button className="icon-button dark" type="button" onClick={onCreatePreset} aria-label="新建预设">
             <Bolt size={18} />
@@ -1885,7 +1905,7 @@ function PresetStudio({
               >
                 <span className="preset-list-glow" aria-hidden="true" />
                 <strong>{preset.name}</strong>
-                <small>{preset.description || "未填写说明"}</small>
+                <small>{preset.description || t("preset.noDescription")}</small>
                 <em>
                   {summary?.activeCount ?? 0}/{summary?.skillIds.length ?? 0}
                 </em>
@@ -1898,12 +1918,12 @@ function PresetStudio({
       <section className="view-card preset-editor" aria-label="预设编辑器">
         <div className="view-card-head">
           <div>
-            <span>自定义装载</span>
-            <strong>{selectedPreset?.name ?? "新任务预设"}</strong>
+            <span>{t("preset.customLoad")}</span>
+            <strong>{selectedPreset?.name ?? t("preset.newTaskPreset")}</strong>
           </div>
           <div className="preset-editor-meter">
             <strong>{activeCount}</strong>
-            <span>/{selectedCount} 激活</span>
+            <span>/{selectedCount} {t("preset.active")}</span>
           </div>
         </div>
 
@@ -2013,10 +2033,10 @@ function PresetStudio({
       <section className="view-card preset-skill-picker" aria-label="分类文件夹选择">
         <div className="view-card-head compact">
           <div>
-            <span>分类选择</span>
-            <strong>{activeFolder ? `${activeFolder.name} 技能` : "分类文件夹"}</strong>
+            <span>{t("preset.folderPicker")}</span>
+            <strong>{activeFolder ? `${activeFolder.name} ${t("preset.skillsUnit")}` : t("preset.categoryFolders")}</strong>
           </div>
-          <em>{activeFolder ? `${visibleSkillOptions.length} 个技能` : `${pickerFolders.length} 个分类`}</em>
+          <em>{activeFolder ? `${visibleSkillOptions.length} ${t("preset.skillsUnit")}` : `${pickerFolders.length} ${t("preset.foldersUnit")}`}</em>
         </div>
 
         <label className="search-box preset-search">
@@ -2024,7 +2044,7 @@ function PresetStudio({
           <input
             value={presetQuery}
             onChange={(event) => onPresetQueryChange(event.target.value)}
-            placeholder={activeFolder ? "筛选该分类的 skill" : "搜索分类文件夹"}
+            placeholder={activeFolder ? t("preset.searchSkillPlaceholder") : t("preset.searchFolderPlaceholder")}
           />
         </label>
 
@@ -2062,7 +2082,7 @@ function PresetStudio({
                     <span className="preset-skill-copy">
                       <strong>{skill.name}</strong>
                       <small>
-                        {skill.categoryName} · {skill.enabled ? "已激活" : "仓库内"} · {inherited ? "通用场景" : skill.source}
+                        {skill.categoryName} · {skill.enabled ? t("preset.skillActivated") : t("preset.skillInVault")} · {inherited ? t("preset.basePresetSource") : skill.source}
                       </small>
                     </span>
                     {inherited ? <em>通用</em> : null}
@@ -2086,8 +2106,8 @@ function PresetStudio({
                 <span>{folder.name}</span>
                 <strong>{folder.count}</strong>
                 <small>
-                  {folder.inheritedCount ? `${folder.inheritedCount} 通用 · ` : ""}
-                  {folder.selectedCount} 自选 · {folder.activeCount} 激活
+                  {folder.inheritedCount ? `${folder.inheritedCount} ${t("preset.inheritedCount")} · ` : ""}
+                  {folder.selectedCount} {t("preset.selectedCount")} · {folder.activeCount} {t("folder.activeCount")}
                 </small>
                 <ChevronRight size={16} />
               </button>
@@ -2234,7 +2254,7 @@ function SkillFileCard({
       </button>
       <div className="skill-file-meta">
         <label className="file-group-select">
-          <span>归类</span>
+          <span>{t("card.group")}</span>
           <select
             aria-label={`将 ${skill.name} 归类到`}
             value={skill.categoryId}
